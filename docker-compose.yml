@@ -3,6 +3,8 @@ services:
 
   postgres:
     build: ./postgreSQL-image
+    hostname: postgres
+    container_name: postgres
     ports:
       - 5432:5432
     environment:
@@ -10,8 +12,9 @@ services:
       - POSTGRES_PASSWORD=root
       - POSTGRES_DB=init_db
       - PGPASSWORD=root
-
   pgadmin:
+    hostname: pgUI
+    container_name: pgUI
     user: root 
     image: dpage/pgadmin4
     restart: always
@@ -23,7 +26,9 @@ services:
 
 
   debezium:
-    image: debezium/connect:1.5
+    image: debezium/connect:1.5  
+    hostname: debezium
+    container_name: debezium
     environment:
       BOOTSTRAP_SERVERS: kafka:9092
       GROUP_ID: 1
@@ -35,26 +40,32 @@ services:
   
 
   zookeeper:
-    image: confluentinc/cp-zookeeper:5.5.3
+    image: bitnami/zookeeper:latest
+    hostname: zookeeper
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
     environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
+      - ALLOW_ANONYMOUS_LOGIN=yes
+      - KAFKA_ADVERTISED_LISTENERS:PLAINTEXT://kafka:9092
+
 
   kafka:
-    image: confluentinc/cp-kafka:5.5.3
-    depends_on: [zookeeper]
-    environment:
-      KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,CONNECTIONS_FROM_HOST://localhost:19092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONNECTIONS_FROM_HOST:PLAINTEXT
-      KAFKA_BROKER_ID: 1
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_JMX_PORT: 9991
+    image: bitnami/kafka:latest
+    hostname: kafka
+    container_name: kafka
     ports:
-    - 9092:9092
-
+      - "9092:9092"
+    environment:
+      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
+      - ALLOW_PLAINTEXT_LISTENER=yes
+    depends_on:
+      - zookeeper
 
   kafdrop:
     image: obsidiandynamics/kafdrop
+    hostname: kafkaUI
+    container_name: kafkaUI
     restart: "no"
     ports:
       - "9000:9000"
@@ -62,3 +73,33 @@ services:
       KAFKA_BROKERCONNECT: "kafka:9092"
     depends_on:
       - kafka
+
+  hudi:
+    image: apachehudi/hudi-hadoop_3.1.0-hive_3.1.2-sparkbase_3.2.1
+    hostname: hudi
+    container_name: hudi
+    environment:
+      - CLUSTER_NAME=hudi_hadoop310_hive312_spark321
+      - SPARK_MASTER_HOST=localhost
+    volumes:
+      - C:\Users\arthu\cloudera-files:/hadoop-data
+    depends_on:
+      - kafka
+    ports:
+      - "8020:8020"
+      - "5005"
+      - 8080:8080
+      - 7077:7077
+      - 8081:8081  
+      - 4041:4040
+      - 34813:34813
+
+  pyspark:
+    image: jupyter/pyspark-notebook:latest
+    hostname: pyspark
+    container_name: pyspark
+    ports:
+      - 8888:8888
+    depends_on:
+      - kafka
+      - hudi
